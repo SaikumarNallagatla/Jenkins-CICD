@@ -7,9 +7,10 @@ pipeline {
                 echo "Successfully connected to GitHub and checked out the code."
             }
         }
+        
         stage('2. Run a Test Command') {
             steps {
-                sh 'ls -la' // List all the files in the workspace
+                sh 'ls -la' // List all the files in the worksggkjh
             }
         }
     }
