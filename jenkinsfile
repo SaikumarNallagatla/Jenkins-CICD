@@ -1,62 +1,59 @@
-// File: Jenkinsfile (Chapter 4 - Push to ECR)
+// Jenkinsfile: Updated "First Strike" Diagnostic Pipeline
 
 pipeline {
+    // Start with the most basic agent possible.
     agent any
 
-    environment {
-        // --- NEW VARIABLES FOR AWS ---
-        // Replace '123456789012' with your actual AWS Account ID.
-        AWS_ACCOUNT_ID = "939338074907" 
-        // Replace 'ap-south-1' with the AWS region your ECR repository is in (e.g., us-east-1).
-        AWS_REGION = "ap-south-1" 
-        
-        // --- VARIABLES FROM PREVIOUS CHAPTER ---
-        IMAGE_NAME = "my-webapp"
-        // In a real sandbox, you would need to find the path to the AWS CLI tool as well.
-        // For this exercise, we will assume 'aws' is in the path.
-        // We will also revert to using the hardcoded docker path that worked before.
-        DOCKER_CMD = "/usr/bin/docker" 
-    }
-
     stages {
-        stage('1. Build Docker Image') {
+        // Stage 1: Confirm Git Connection
+        stage('1. Checkout Code') {
             steps {
-                echo "Building Docker image..."
-                // Build the image with a local tag
-                sh "${DOCKER_CMD} build -t ${IMAGE_NAME}:${env.BUILD_NUMBER} ."
+                echo "SUCCESS: Git checkout is working."
+            }
+        }
+        
+        // Stage 2: Diagnose the Jenkins Executor Environment
+        // This is the most important stage for troubleshooting.
+        stage('2. Jenkins Environment Recon') {
+            steps {
+                echo "--- Running diagnostics from INSIDE the Jenkins build ---"
+                
+                // Test 1: Who is the Jenkins process running as? Is it 'root' or 'jenkins'?
+                sh 'echo "--- Running \'id\' command ---"'
+                sh 'id'
+
+                // Test 2: Can the Jenkins user see the docker executable?
+                sh 'echo "--- Running \'which docker\' command ---"'
+                sh 'which docker'
             }
         }
 
-        // --- THIS IS OUR NEW STAGE ---
-        stage('2. Push Image to AWS ECR') {
+        // Stage 3: The Primary Test - Attempt Docker Build
+        // We use the absolute path to bypass any potential PATH issues.
+        stage('3. Attempt Docker Build') {
             steps {
-                // This 'withCredentials' block is the magic of Jenkins security.
-                // It finds the credential with the ID 'my-aws-creds' and temporarily
-                // exposes it as environment variables (AWS_ACCESS_KEY_ID, etc.)
-                // ONLY inside this block. They are never printed to the log.
-                withCredentials([aws(credentialsId: 'my-aws-creds', region: AWS_REGION)]) {
-                    
-                    echo "Logging into AWS ECR..."
-                    // This command gets a temporary login token from AWS and pipes it to the docker login command.
-                    // This is the modern, secure way to log in to ECR.
-                    sh "aws ecr get-login-password --region ${AWS_REGION} | ${DOCKER_CMD} login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+                echo "Attempting to build Docker image using the absolute path..."
 
-                    echo "Tagging the image for ECR..."
-                    // We must re-tag our image to match the full ECR repository URI.
-                    sh "${DOCKER_CMD} tag ${IMAGE_NAME}:${env.BUILD_NUMBER} ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_NAME}:${env.BUILD_NUMBER}"
-
-                    echo "Pushing the image to ECR..."
-                    // Now, push the newly tagged image.
-                    sh "${DOCKER_CMD} push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_NAME}:${env.BUILD_NUMBER}"
-                }
+                // If 'id' shows 'root' OR the 'jenkins' user is in the 'docker' group,
+                // this command should succeed.
+                // If 'id' shows a non-privileged 'jenkins' user, this will fail with 'permission denied'.
+                sh "/usr/bin/docker build -t my-webapp:${env.BUILD_NUMBER} ."
             }
         }
-
-        stage('3. Verify') {
+        
+        // Stage 4: Verify the result of the build
+        stage('4. Verify Image') {
             steps {
-                // This step isn't strictly necessary but is good for confirmation.
-                echo "Image pushed successfully. You can now see it in the AWS ECR Console."
+                echo "Listing Docker images on the host to confirm success..."
+                sh "/usr/bin/docker images"
             }
+        }
+    }
+    
+    post {
+        always {
+            // This block runs no matter what, telling us the pipeline has finished.
+            echo "Diagnostic pipeline run has finished."
         }
     }
 }
