@@ -1,39 +1,16 @@
+// SIMPLE JENKINSFILE FOR CHAPTER 2 TEST
 pipeline {
     agent any
-
-    // Define variables that can be used throughout the pipeline
-    environment {
-        IMAGE_NAME = "webapp-image"
-    }
-
     stages {
         stage('1. Checkout Code') {
             steps {
-                echo "Code checked out successfully."
+                echo "Successfully connected to GitHub and checked out the code."
             }
         }
-        
-        stage('2. Build Docker Image') {
+        stage('2. Run a Test Command') {
             steps {
-                echo "Starting Docker image build..."
-                
-                // Use the 'sh' step to execute a standard Docker build command.
-                // We combine the IMAGE_NAME from the environment block with the unique BUILD_NUMBER.
-                // This creates tags like "webapp-image:1", "webapp-image:2", etc.
-                sh "docker build -t ${env.IMAGE_NAME}:${env.BUILD_NUMBER} ."
-
-                echo "Docker image '${env.IMAGE_NAME}:${env.BUILD_NUMBER}' built successfully."
+                sh 'ls -la' // List all the files in the workspace
             }
-        }
-    }
-    
-    post {
-        always {
-            // This block runs at the end of the pipeline, regardless of success or failure.
-            // It's a good place for cleanup tasks.
-            echo "Pipeline finished."
-            // Let's see the docker images we have on the agent now.
-            sh "docker images"
         }
     }
 }
