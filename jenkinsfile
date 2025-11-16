@@ -39,7 +39,7 @@ pipeline {
     // The 'post' block defines actions to run at the end of the pipeline.
     post {
         // 'always' will run whether the pipeline succeeded or failed.
-        // It's perfect for cleanup or notification steps.
+        // It's perfect for cleanup or notification steps. thank you sai
         always {
             echo "Pipeline run has finished."
             echo "Listing Docker images on the agent to verify our build..."
