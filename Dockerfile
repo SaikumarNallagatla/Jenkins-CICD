@@ -1,25 +1,27 @@
-# --- Stage 1: Use an official Python runtime as a parent image ---
-# Using a 'slim' image is a good practice to keep the final image size smaller.
+# File: Dockerfile
+
+# --- Stage 1: Base Image ---
+# Start from an official, lightweight Python image. 'slim' is a good choice for production.
 FROM python:3.9-slim
 
-# --- Stage 2: Set the working directory inside the container ---
-# This is where our application code will live.
+# --- Stage 2: Set Working Directory ---
+# Set a directory inside the container where our code will live.
 WORKDIR /app
 
-# --- Stage 3: Copy dependency file and install dependencies ---
-# We copy only the requirements file first to take advantage of Docker's layer caching.
-# If requirements.txt doesn't change, Docker won't re-run this step on subsequent builds.
+# --- Stage 3: Install Dependencies ---
+# Copy ONLY the requirements file first. This leverages Docker's layer caching.
+# If this file doesn't change, Docker will reuse this layer, making future builds faster.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# --- Stage 4: Copy the rest of the application code ---
-# Now copy the application source code into the container's working directory.
+# --- Stage 4: Copy Application Code ---
+# Now, copy the rest of the application files into the working directory.
 COPY . .
 
-# --- Stage 5: Expose a port ---
-# Inform Docker that the container listens on port 5000 at runtime.
+# --- Stage 5: Expose Port ---
+# Inform Docker that the application inside the container will listen on port 5000.
 EXPOSE 5000
 
-# --- Stage 6: Define the command to run the application ---
-# This is the command that will be executed when the container starts.
+# --- Stage 6: Define Runtime Command ---
+# Specify the command to run when a container is started from this image.
 CMD ["python", "app.py"]
