@@ -1,20 +1,27 @@
-// File: Jenkinsfile (UPDATED FOR SANDBOX)
-
-// File: Jenkinsfile (Final Version for Sandbox)
+// File: Jenkinsfile (The Final, Correct Version)
 
 pipeline {
-    // This is the most important change.
-    // Instead of 'agent any', we specify that we want an agent that IS a Docker container.
-    // We provide a Docker image that has all the tools we need (like Python, git, etc.).
-    // This is a common public image used for building Python projects.
-    agent {
-        docker { 
-            image 'python:3.9-slim' 
-            reuseNode true // This tells Jenkins to run on the same machine that has Docker installed.
-        }
+    // THIS IS THE KEY: Define the agent as 'none' at the top level.
+    // This tells Jenkins not to grab an agent until we specify one in a stage.
+    // However, for this to work, we will apply tools and agent to all stages.
+    
+    // Let's simplify. We apply the tools and agent to the whole pipeline.
+
+    // 1. First, prepare the necessary tools for the ENTIRE pipeline.
+    tools {
+        dockerTool 'default-docker'
     }
 
-    // We do NOT need a 'tools' block anymore because the client is assumed to be available.
+    // 2. NOW, define the agent. Jenkins will use the tool above to start this agent.
+    agent {
+        docker {
+            image 'python:3.9-slim'
+            // This argument is crucial. It mounts the host's Docker socket
+            // into our agent container, solving the "cannot connect" error.
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+            reuseNode true
+        }
+    }
 
     environment {
         IMAGE_NAME = "my-webapp"
@@ -22,12 +29,12 @@ pipeline {
 
     stages {
         stage('1. Build Docker Image') {
-            // This stage now runs INSIDE the 'python:3.9-slim' container.
             steps {
+                echo "--- Now running inside a python:3.9-slim container ---"
                 echo "--- Starting Docker Image Build ---"
 
-                // This command will be sent from our temporary python container
-                // to the host's Docker daemon.
+                // This 'docker' command is now executed from WITHIN our python agent container,
+                // but it communicates to the HOST's docker daemon via the mounted socket.
                 sh "docker build -t ${env.IMAGE_NAME}:${env.BUILD_NUMBER} ."
 
                 echo "--- Docker Image Build Complete ---"
@@ -36,7 +43,7 @@ pipeline {
 
         stage('2. Verify Image') {
             steps {
-                echo "Listing Docker images to verify our build..."
+                echo "Listing Docker images on the HOST to verify our build..."
                 sh "docker images"
             }
         }
