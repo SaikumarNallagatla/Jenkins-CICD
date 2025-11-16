@@ -1,50 +1,39 @@
-// File: Jenkinsfile
+// File: Jenkinsfile (UPDATED FOR SANDBOX)
 
 pipeline {
-    // 'agent any' means Jenkins can use any available agent to run this pipeline.
     agent any
 
-    // The 'environment' block is the best place to define variables
-    // that you'll use throughout your pipeline.
+    // The 'tools' block tells Jenkins to add specific tools to the PATH for this pipeline.
+    tools {
+        // The tool type is 'dockerTool', and its name must match
+        // the name you gave it in Global Tool Configuration.
+        dockerTool 'default-docker' 
+    }
+
     environment {
-        IMAGE_NAME = "my-webapp" // A clean, simple name for our application image
+        IMAGE_NAME = "my-webapp"
     }
 
     stages {
-        // Stage 1 remains the same. It's a good practice to confirm checkout.
         stage('1. Checkout Code') {
             steps {
-                echo "Jenkins has successfully checked out the code from the Git repository."
+                echo "Code checked out successfully."
             }
         }
         
-        // This is our new, most important stage!
         stage('2. Build Docker Image') {
             steps {
                 echo "--- Starting Docker Image Build ---"
-                
-                // We use the 'sh' step to execute a shell command, just like in a terminal.
-                // This is the standard command to build a Docker image.
-                // '-t' stands for 'tag'. It gives our image a name and a version.
-                // We are creating a unique tag for every build using the built-in Jenkins
-                // environment variable 'BUILD_NUMBER'. This is a critical best practice.
-                // It will produce tags like: my-webapp:1, my-webapp:2, etc.
+                // Now the 'docker' command will be found because of the 'tools' block.
                 sh "docker build -t ${env.IMAGE_NAME}:${env.BUILD_NUMBER} ."
-
                 echo "--- Docker Image Build Complete ---"
             }
         }
     }
     
-    // The 'post' block defines actions to run at the end of the pipeline.
     post {
-        // 'always' will run whether the pipeline succeeded or failed.
-        // It's perfect for cleanup or notification steps. thank you sai
         always {
-            echo "Pipeline run has finished."
-            echo "Listing Docker images on the agent to verify our build..."
-            
-            // Let's run a command to see the image we just created.
+            echo "Pipeline finished. Listing Docker images..."
             sh "docker images"
         }
     }
