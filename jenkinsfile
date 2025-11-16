@@ -1,59 +1,46 @@
-// Jenkinsfile: Updated "First Strike" Diagnostic Pipeline
+// File: Jenkinsfile (The Professional Docker Agent Version)
 
 pipeline {
-    // Start with the most basic agent possible.
-    agent any
-
-    stages {
-        // Stage 1: Confirm Git Connection
-        stage('1. Checkout Code') {
-            steps {
-                echo "SUCCESS: Git checkout is working."
-            }
-        }
-        
-        // Stage 2: Diagnose the Jenkins Executor Environment
-        // This is the most important stage for troubleshooting.
-        stage('2. Jenkins Environment Recon') {
-            steps {
-                echo "--- Running diagnostics from INSIDE the Jenkins build ---"
-                
-                // Test 1: Who is the Jenkins process running as? Is it 'root' or 'jenkins'?
-                sh 'echo "--- Running \'id\' command ---"'
-                sh 'id'
-
-                // Test 2: Can the Jenkins user see the docker executable?
-                sh 'echo "--- Running \'which docker\' command ---"'
-                sh 'which docker'
-            }
-        }
-
-        // Stage 3: The Primary Test - Attempt Docker Build
-        // We use the absolute path to bypass any potential PATH issues.
-        stage('3. Attempt Docker Build') {
-            steps {
-                echo "Attempting to build Docker image using the absolute path..."
-
-                // If 'id' shows 'root' OR the 'jenkins' user is in the 'docker' group,
-                // this command should succeed.
-                // If 'id' shows a non-privileged 'jenkins' user, this will fail with 'permission denied'.
-                sh "/usr/bin/docker build -t my-webapp:${env.BUILD_NUMBER} ."
-            }
-        }
-        
-        // Stage 4: Verify the result of the build
-        stage('4. Verify Image') {
-            steps {
-                echo "Listing Docker images on the host to confirm success..."
-                sh "/usr/bin/docker images"
-            }
+    // THIS IS THE KEY CHANGE. We are defining our build agent.
+    agent {
+        // We specify we want a Docker agent.
+        docker {
+            // The image to use for our build environment. 'docker:dind' (Docker-in-Docker)
+            // is a common choice, or we can use a simpler one. Let's start with a basic image.
+            image 'docker:latest'
+            
+            // This argument is crucial. It mounts the host's Docker socket
+            // into our agent container, solving the "permission denied" error.
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
-    
-    post {
-        always {
-            // This block runs no matter what, telling us the pipeline has finished.
-            echo "Diagnostic pipeline run has finished."
+
+    stages {
+        stage('1. Verify Docker Environment') {
+            steps {
+                echo "--- Running inside a Docker container agent ---"
+                
+                // Let's verify our environment inside the new container.
+                sh 'docker --version'
+                sh 'docker info' // This will show we can connect to the daemon.
+            }
+        }
+
+        stage('2. Build Application Image') {
+            steps {
+                echo "--- Starting Application Docker Image Build ---"
+                
+                // Because our agent IS a Docker container with the client,
+                // we can just use the 'docker' command directly.
+                sh "docker build -t my-webapp:${env.BUILD_NUMBER} ."
+            }
+        }
+
+        stage('3. Verify Build') {
+            steps {
+                echo "--- Listing images to confirm build success ---"
+                sh "docker images"
+            }
         }
     }
 }
