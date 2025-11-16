@@ -1,33 +1,62 @@
-// File: Jenkinsfile (The "Back to Basics" Final Attempt)
+// File: Jenkinsfile (Chapter 4 - Push to ECR)
 
 pipeline {
-    // Use the most basic agent available.
     agent any
 
-    stages {
-        stage('Build Docker Image') {
-            steps {
-                echo "Attempting to build Docker image using the absolute path..."
-                
-                // We are NOT using 'docker'. We are telling the shell to execute
-                // the file located at '/usr/bin/docker'. This bypasses all PATH issues.
-                sh "/usr/bin/docker build -t my-webapp:${env.BUILD_NUMBER} ."
-            }
-        }
-
-        stage('Verify Build') {
-            steps {
-                echo "Listing Docker images on the host..."
-
-                // We must use the absolute path here as well.
-                sh "/usr/bin/docker images"
-            }
-        }
+    environment {
+        // --- NEW VARIABLES FOR AWS ---
+        // Replace '123456789012' with your actual AWS Account ID.
+        AWS_ACCOUNT_ID = "939338074907" 
+        // Replace 'ap-south-1' with the AWS region your ECR repository is in (e.g., us-east-1).
+        AWS_REGION = "ap-south-1" 
+        
+        // --- VARIABLES FROM PREVIOUS CHAPTER ---
+        IMAGE_NAME = "my-webapp"
+        // In a real sandbox, you would need to find the path to the AWS CLI tool as well.
+        // For this exercise, we will assume 'aws' is in the path.
+        // We will also revert to using the hardcoded docker path that worked before.
+        DOCKER_CMD = "/usr/bin/docker" 
     }
-    
-    post {
-        always {
-            echo "Pipeline run has finished."
+
+    stages {
+        stage('1. Build Docker Image') {
+            steps {
+                echo "Building Docker image..."
+                // Build the image with a local tag
+                sh "${DOCKER_CMD} build -t ${IMAGE_NAME}:${env.BUILD_NUMBER} ."
+            }
+        }
+
+        // --- THIS IS OUR NEW STAGE ---
+        stage('2. Push Image to AWS ECR') {
+            steps {
+                // This 'withCredentials' block is the magic of Jenkins security.
+                // It finds the credential with the ID 'my-aws-creds' and temporarily
+                // exposes it as environment variables (AWS_ACCESS_KEY_ID, etc.)
+                // ONLY inside this block. They are never printed to the log.
+                withCredentials([aws(credentialsId: 'my-aws-creds', region: AWS_REGION)]) {
+                    
+                    echo "Logging into AWS ECR..."
+                    // This command gets a temporary login token from AWS and pipes it to the docker login command.
+                    // This is the modern, secure way to log in to ECR.
+                    sh "aws ecr get-login-password --region ${AWS_REGION} | ${DOCKER_CMD} login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+                    echo "Tagging the image for ECR..."
+                    // We must re-tag our image to match the full ECR repository URI.
+                    sh "${DOCKER_CMD} tag ${IMAGE_NAME}:${env.BUILD_NUMBER} ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_NAME}:${env.BUILD_NUMBER}"
+
+                    echo "Pushing the image to ECR..."
+                    // Now, push the newly tagged image.
+                    sh "${DOCKER_CMD} push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_NAME}:${env.BUILD_NUMBER}"
+                }
+            }
+        }
+
+        stage('3. Verify') {
+            steps {
+                // This step isn't strictly necessary but is good for confirmation.
+                echo "Image pushed successfully. You can now see it in the AWS ECR Console."
+            }
         }
     }
 }
