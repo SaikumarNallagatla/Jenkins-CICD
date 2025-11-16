@@ -1,40 +1,44 @@
 // File: Jenkinsfile (UPDATED FOR SANDBOX)
 
-pipeline {
-    agent any
+// File: Jenkinsfile (Final Version for Sandbox)
 
-    // The 'tools' block tells Jenkins to add specific tools to the PATH for this pipeline.
-    tools {
-        // The tool type is 'dockerTool', and its name must match
-        // the name you gave it in Global Tool Configuration.
-        dockerTool 'default-docker' 
+pipeline {
+    // This is the most important change.
+    // Instead of 'agent any', we specify that we want an agent that IS a Docker container.
+    // We provide a Docker image that has all the tools we need (like Python, git, etc.).
+    // This is a common public image used for building Python projects.
+    agent {
+        docker { 
+            image 'python:3.9-slim' 
+            reuseNode true // This tells Jenkins to run on the same machine that has Docker installed.
+        }
     }
+
+    // We do NOT need a 'tools' block anymore because the client is assumed to be available.
 
     environment {
         IMAGE_NAME = "my-webapp"
     }
 
     stages {
-        stage('1. Checkout Code') {
-            steps {
-                echo "Code checked out successfully."
-            }
-        }
-        
-        stage('2. Build Docker Image') {
+        stage('1. Build Docker Image') {
+            // This stage now runs INSIDE the 'python:3.9-slim' container.
             steps {
                 echo "--- Starting Docker Image Build ---"
-                // Now the 'docker' command will be found because of the 'tools' block.
+
+                // This command will be sent from our temporary python container
+                // to the host's Docker daemon.
                 sh "docker build -t ${env.IMAGE_NAME}:${env.BUILD_NUMBER} ."
+
                 echo "--- Docker Image Build Complete ---"
             }
         }
-    }
-    
-    post {
-        always {
-            echo "Pipeline finished. Listing Docker images..."
-            sh "docker images"
+
+        stage('2. Verify Image') {
+            steps {
+                echo "Listing Docker images to verify our build..."
+                sh "docker images"
+            }
         }
     }
 }
